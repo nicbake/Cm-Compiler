@@ -1,0 +1,35 @@
+/* A program that contain mutual recursions */
+
+/* no function prototype defined for  g */
+/* function f is missing the parameter declaration for int n  */
+
+int x;
+int y;
+
+void f(void) {
+    g(n);
+    y = y - 1;
+}
+
+void g(int m) {
+    
+    m = m - 1;
+    
+    if (m > 0)
+        f(m);
+        y = y - 1;
+        g(m);
+
+}
+
+int main(void) {
+
+    x = input();
+    y = input();
+
+    g(x);
+
+    output(x);
+    output(y);
+    
+}

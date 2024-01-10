@@ -1,0 +1,17 @@
+/* program written as if it were a python script */
+
+int a;
+int b;
+int c;
+
+a = 1;
+b = 2;
+c = 3;
+
+a = b + c;
+
+if(a < 3){
+    output(b);
+} else {
+    output(c);
+}

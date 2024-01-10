@@ -1,0 +1,18 @@
+/* basic recursion, including a function prototype, counts up to max from x */
+
+int rec(int x, int max);
+
+int rec(int x, int max){
+    output(x);
+
+    if(x > max){
+        return x;
+    }
+
+    return(rec(x, max));
+
+}
+
+void main(void){
+    rec(0, 10);
+}

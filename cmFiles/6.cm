@@ -1,0 +1,23 @@
+/* errors related to test conditions */
+/* foo() is defined as a void function, but called as a boolean function */
+
+void foo(void) {
+}
+
+void main(void) {
+  int x; 
+  int fac;
+
+  x = 10;
+  fac = 1;
+  while (foo()) {    
+    fac = fac * x;
+    x = x - 1;
+  } 
+
+  if (foo()) {       
+    x = 1;
+  } else {
+    x = 0;
+  }
+}

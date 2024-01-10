@@ -1,0 +1,15 @@
+/* takes an input, outputs it the number of times equal to the input */
+
+void main(void) {
+  
+    int x;
+    int i;
+
+    x = input();
+    i = 0;
+
+    while (i < x) {
+        output(x);
+        i = i + 1;
+    }
+}

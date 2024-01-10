@@ -1,0 +1,20 @@
+/* A factorial program that uses a Boolean variable */
+
+/* x is not defined */
+/* fac is defined as an in but used as a bool */
+
+void main(void) {
+    int fac;
+    bool test;
+
+    x = input();
+    fac = true;
+    test = x > 1;
+    
+    while (fac) {
+        fac = fac * x;
+        x = x - 1;
+        test = x > 1;
+    }
+    output(fac);
+}

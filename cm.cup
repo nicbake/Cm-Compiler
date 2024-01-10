@@ -1,0 +1,332 @@
+/*
+  Program Information
+  Authors: Nicholas Baker & Garrett Holmes
+  File Name: cm.cup
+  Adapted from: Fei Song
+*/
+   
+/* ----------------------Preliminary Declarations Section--------------------*/
+   
+import absyn.*;
+   
+/* Parser code to change the way the parser reports errors (include
+   line and column number of the error). */
+parser code {:
+    
+    /* Change the method report_error so it will display the line and
+       column of where the error occurred in the input as well as the
+       reason for the error which is passed into the method in the
+       String 'message'. */
+    public void report_error(String message, Object info) {
+   
+        /* Create a StringBuffer called 'm' with the string 'Error' in it. */
+        StringBuffer m = new StringBuffer("Error");
+   
+        /* Check if the information passed to the method is the same
+           type as the type java_cup.runtime.Symbol. */
+        if (info instanceof java_cup.runtime.Symbol) {
+            /* Declare a java_cup.runtime.Symbol object 's' with the
+               information in the object info that is being typecasted
+               as a java_cup.runtime.Symbol object. */
+            java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+   
+            /* Check if the line number in the input is greater or
+               equal to zero. */
+            if (s.left >= 0) {                
+                /* Add to the end of the StringBuffer error message
+                   the line number of the error in the input. */
+                m.append(" in line "+(s.left+1));   
+                /* Check if the column number in the input is greater
+                   or equal to zero. */
+                if (s.right >= 0)                    
+                    /* Add to the end of the StringBuffer error message
+                       the column number of the error in the input. */
+                    m.append(", column "+(s.right+1));
+            }
+        }
+   
+        /* Add to the end of the StringBuffer error message created in
+           this method the message that was passed into this method. */
+        m.append(" : "+message);
+   
+        /* Print the contents of the StringBuffer 'm', which contains
+           an error message, out on a line. */
+        System.err.println(m);
+    }
+   
+    /* Change the method report_fatal_error so when it reports a fatal
+       error it will display the line and column number of where the
+       fatal error occurred in the input as well as the reason for the
+       fatal error which is passed into the method in the object
+       'message' and then exit.*/
+    public void report_fatal_error(String message, Object info) {
+        report_error(message, info);
+        System.exit(1);
+    }
+
+    /* Assume true at the start, but set to false with parsing errors */
+    public static boolean valid = true;
+
+:};
+   
+   
+/* ------------Declaration of Terminals and Non Terminals Section----------- */
+   
+terminal BOOL, ELSE, IF, INT, RETURN, VOID, WHILE;
+terminal PLUS, MINUS, TIMES, OVER, LT, LTEQ, GT, GTEQ, EQ, NOTEQ, TILDA;
+terminal OR, AND, ASSIGN, SEMI, COMMA;
+terminal OPAREN, CPAREN, OBRACKET, CBRACKET, OBRACE, CBRACE;
+terminal String ID, NUM, TRUTH;
+
+non terminal DecList program, declaration_list;
+non terminal VarDec param, var_declaration;
+non terminal VarDecList local_declarations, params, param_list;
+non terminal ExpList statement_list, args, arg_list;
+non terminal Exp statement, expression_stmt, expression, compound_stmt, selection_stmt, iteration_stmt, return_stmt;
+non terminal NameTy type_specifier;
+non terminal Var var;
+non terminal Dec declaration, fun_prototype;
+non terminal FunctionDec fun_declaration;
+
+precedence nonassoc LT, LTEQ, GT, GTEQ, EQ, NOTEQ, OR, AND;
+
+precedence left PLUS, MINUS;
+precedence left TIMES, OVER;
+precedence left ELSE;
+/* ----------------------------Grammar Section-------------------- */
+   
+start with program;
+
+program       ::= declaration_list:d
+                  {: RESULT = d; :}
+                ;   
+
+declaration_list ::= declaration_list:d1 declaration:d2
+                  {: DecList t = d1;
+                    while( t.tail != null )
+                      t = t.tail;
+                    t.tail = new DecList(d2, null);
+                    RESULT = d1;
+                  :}
+                | declaration:d
+                  {: RESULT = new DecList(d, null); :}
+                ;
+
+declaration ::= var_declaration:v
+                  {: RESULT = v; :}
+                | fun_prototype:p
+                  {: RESULT = p; :}
+                | fun_declaration:f
+                  {: RESULT = f; :}
+                ;
+
+var_declaration ::= type_specifier:t ID:v SEMI
+                  {: RESULT = new SimpleDec(vleft, vright, t, v); :}
+                | type_specifier:t ID:v OBRACKET NUM:s CBRACKET SEMI
+                  {: RESULT = new ArrayDec(vleft, vright, t, v, Integer.parseInt(s)); :}
+                | type_specifier:t ID:v error:err
+                  {: parser.report_error("in line " + (errleft + 1) + ", column " + (errright + 1) + ": Missing semicolon",null); 
+                    RESULT = new SimpleDec(vleft, vright, t, v); :}
+                | type_specifier:t ID:v OBRACKET NUM:s CBRACKET error:err
+                  {: parser.report_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : Missing semicolon",null);  
+                    RESULT = new ArrayDec(vleft, vright, t, v, Integer.parseInt(s)); :}
+                | type_specifier:t ID:v OBRACKET error:err CBRACKET SEMI
+                  {: parser.report_fatal_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : Array Declaraction missing size",null);:}
+                | type_specifier:t ID:v OBRACKET error:err CBRACKET error:err2
+                  {:  parser.report_error("in line " + (err2left + 1) + ", column " + (err2right + 1) + " : Missing semicolon",null);   
+                      parser.report_fatal_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : Array Declaraction missing size",null);:}
+                ;
+
+type_specifier ::= BOOL:t
+                  {: RESULT = new NameTy(tleft, tright, TYPE.BOOL); :}
+                | INT:t
+                  {: RESULT = new NameTy(tleft, tright, TYPE.INT); :}
+                | VOID:t
+                  {: RESULT = new NameTy(tleft, tright, TYPE.VOID); :}
+                ;
+
+fun_prototype ::= type_specifier:t ID:id OPAREN params:p CPAREN SEMI
+                  {: RESULT = new FunctionDec(tleft, tright, t, id, p, null); :}
+                | type_specifier:t ID:id OPAREN params:p CPAREN error:err
+                  {: parser.report_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : Missing semicolon",err);  
+                      RESULT = new FunctionDec(tleft, tright, t, id, p, null); :}
+                | type_specifier:ts ID:id OPAREN error:err CPAREN SEMI
+                  {: parser.report_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : function prototype must have void for empty parameters", err);
+                      RESULT = new FunctionDec(tsleft, tsright, ts, id, null, null); 
+                  :}
+                ;
+
+fun_declaration ::= type_specifier:t ID:id OPAREN params:p CPAREN compound_stmt:b
+                  {: RESULT = new FunctionDec(tleft, tright, t, id, p, b); :}
+                | type_specifier:ts ID:i OPAREN error:err CPAREN compound_stmt:cs
+                  {: parser.report_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : Must have void for empty parameters",err);
+                  RESULT = new FunctionDec(tsleft, tsright, ts, i,null,cs);:}
+                ;
+
+params ::= param_list:p
+                  {: RESULT = p; :}
+                | VOID
+                ;
+
+param_list ::= param_list:p1 COMMA param:p2
+                  {: VarDecList t = p1;
+                    while( t.tail != null )
+                      t = t.tail;
+                    t.tail = new VarDecList(p2, null);
+                    RESULT = p1;
+                  :}
+                | param:p
+                  {: RESULT = new VarDecList(p, null); :}
+                ;
+
+param ::= type_specifier:t ID:v
+                  {: RESULT = new SimpleDec(vleft, vright, t, v); :}
+                | type_specifier:t ID:v OBRACKET CBRACKET
+                  {: RESULT = new ArrayDec(vleft, vright, t, v, 0); :}
+                ;
+
+compound_stmt ::= OBRACE local_declarations:l statement_list:s CBRACE
+                  {: RESULT = new CompoundExp(lleft, lright, l, s); :}
+                | OBRACE error:err local_declarations:l statement_list:s CBRACE
+                  {: parser.report_fatal_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : Compound expression must be of format [declarations] [expressions].",null); :}
+                ;
+
+local_declarations ::= local_declarations:l var_declaration:v
+                  {: VarDecList t = l;
+                    if (t == null) {
+                      l = new VarDecList(v, null);
+                    } else {
+                      while( t.tail != null )
+                        t = t.tail;
+                      t.tail = new VarDecList(v, null);
+                    }
+                    RESULT = l;
+                  :}
+                |
+                  {: RESULT = null; :}
+                ;
+
+statement_list ::= statement_list:sl statement:s
+                  {: ExpList t = sl;
+                    if (t == null) {
+                      sl = new ExpList(s, null);
+                    } else {
+                      while( t.tail != null )
+                        t = t.tail;
+                      t.tail = new ExpList(s, null);
+                    }
+                    RESULT = sl;
+                  :}
+                |
+                  {: RESULT = null; :}
+                ;
+
+statement ::= expression_stmt:e
+                  {: RESULT = e; :}
+                | compound_stmt:c
+                  {: RESULT = c; :}
+                | selection_stmt:s
+                  {: RESULT = s; :}
+                | iteration_stmt:i
+                  {: RESULT = i; :}
+                | return_stmt:r
+                  {: RESULT = r; :}
+                ;
+
+expression_stmt ::= expression:e SEMI
+                  {: RESULT = e; :}
+                | expression:e error:err
+                  {: 
+                    parser.report_error("in line " + (errleft + 1) + ", column " + (errright + 1) + " : Missing semicolon",null); 
+                    RESULT = e;
+                  :}
+                | SEMI
+                ;
+
+selection_stmt ::= IF:i OPAREN expression:e CPAREN statement:s
+                  {: RESULT = new IfExp(ileft, iright, e, s, new NilExp(ileft, iright)); :}
+                | IF:i OPAREN expression:e CPAREN statement:s ELSE statement:s2
+                  {: RESULT = new IfExp(ileft, iright, e, s, s2); :}
+                ;
+
+iteration_stmt ::= WHILE:w OPAREN expression:e CPAREN statement:s
+                  {: RESULT = new WhileExp(wleft, wright, e, s); :}
+                |
+                WHILE:w error:e statement:s
+                  {: parser.report_fatal_error("in line " + (eleft + 1) + ", column " + (eright + 1) + " : While loop has no clause",null); :}
+                ;
+
+return_stmt ::= RETURN:r expression:e SEMI
+                  {: RESULT = new ReturnExp(rleft, rright, e); :}
+                | RETURN:r SEMI
+                  {: RESULT = new ReturnExp(rleft, rright, new NilExp(rleft, rright)); :}
+                ;
+
+expression ::= var:v ASSIGN expression:e
+                  {: RESULT = new AssignExp(vleft, vright, new VarExp(vleft, vright, v), e); :}
+                | expression:o OR expression:a
+                  {: RESULT = new OpExp(oleft, oright, o, OpExp.OR, a); :}
+                | expression:a AND expression:u
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.AND, u); :}
+                | TILDA expression:u
+                  {: RESULT = new OpExp(uleft, uright, new NilExp(uleft, uright), OpExp.NOT, u); :}
+                | expression:a LTEQ expression:a2
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.LTEQ, a2); :}
+                | expression:a LT expression:a2
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.LT, a2); :}
+                | expression:a GT expression:a2
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.GT, a2); :}
+                | expression:a GTEQ expression:a2
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.GTEQ, a2); :}
+                | expression:a EQ expression:a2
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.EQ, a2); :}
+                | expression:a NOTEQ expression:a2
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.NE, a2); :}
+                | expression:a PLUS expression:t
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.PLUS, t); :}
+                | expression:a MINUS expression:t
+                  {: RESULT = new OpExp(aleft, aright, a, OpExp.MINUS, t); :}
+                | expression:t TIMES expression:s
+                  {: RESULT = new OpExp(tleft, tright, t, OpExp.MUL, s); :}
+                | expression:t OVER expression:s
+                  {: RESULT = new OpExp(tleft, tright, t, OpExp.DIV, s); :}
+                | MINUS expression:s
+                  {: RESULT = new OpExp(sleft, sright, new NilExp(sleft, sright), OpExp.UMINUS, s); :}
+                | OPAREN expression:e CPAREN
+                  {: RESULT = e; :}
+                | var: v
+                  {: RESULT = new VarExp(vleft, vright, v); :}
+                | ID:id OPAREN args:a CPAREN
+                  {: RESULT = new CallExp(idleft, idright, id, a); :}
+                | NUM:n
+                  {: RESULT = new IntExp(nleft, nright, Integer.parseInt(n)); :}
+                | TRUTH:t
+                  {: RESULT = new BoolExp(tleft, tright, Boolean.parseBoolean(t)); :}
+                ;
+
+var           ::= ID:i
+                  {: 
+                    RESULT = new SimpleVar(ileft, iright, i);
+                  :}
+                | ID:i OBRACKET expression:e CBRACKET
+                  {: 
+                    RESULT = new IndexVar(ileft, iright, i, e);
+                  :}
+                ;
+
+args ::= arg_list:a
+                  {: RESULT = a; :}
+                |
+                  {: RESULT = null; :}
+                ;
+
+arg_list ::= arg_list:a COMMA expression:e
+                  {: ExpList t = a;
+                    while( t.tail != null )
+                      t = t.tail;
+                    t.tail = new ExpList(e, null);
+                    RESULT = a;
+                  :}
+                | expression:e
+                  {: RESULT = new ExpList(e, null); :}
+                ;
